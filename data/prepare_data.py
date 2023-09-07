@@ -24,13 +24,13 @@ templates = [
     "Issues of frequent {}.",
     "{} over the last few days.",
     "Sporadic {}.",
-    "Mild case of {}."
+    "Mild case of {}.",
 ]
 
 neg_templates = [
     "Patient reports no {}.",
     "No evidence of {} seen.",
-    "{} is not present."
+    "{} is not present.",
 ]
 
 
@@ -49,34 +49,36 @@ def to_symptoms_string(row: pd.Series) -> str:
     symptom_sentences = []
     for symptom in symptoms:
         symptom_sentences.append(
-            templates[random.randint(0, len(templates) - 1)]
-            .replace("{}", symptom)
+            templates[random.randint(0, len(templates) - 1)].replace("{}", symptom)
         )
 
     total_negative = 0
     for non_symptom in non_symptoms:
         if random.random() < 0.1 and total_negative < 3:
             symptom_sentences.append(
-                neg_templates[random.randint(0, len(neg_templates) - 1)]
-                .replace("{}", non_symptom)
+                neg_templates[random.randint(0, len(neg_templates) - 1)].replace(
+                    "{}", non_symptom
+                )
             )
             total_negative += 1
 
     random.shuffle(symptom_sentences)
 
-    res = " ".join(symptom_sentences) \
-        .replace(" _", " ") \
-        .replace("_ ", " ") \
+    res = (
+        " ".join(symptom_sentences)
+        .replace(" _", " ")
+        .replace("_ ", " ")
         .replace("_", " ")
+    )
 
     return res
 
 
 def add_noise(data):
-    if 'Unnamed: 133' in data.columns:
-        data = data.drop('Unnamed: 133', axis=1)
-    data['symptoms'] = data.apply(to_symptoms_string, axis=1)
-    return data[['symptoms', 'prognosis']]
+    if "Unnamed: 133" in data.columns:
+        data = data.drop("Unnamed: 133", axis=1)
+    data["symptoms"] = data.apply(to_symptoms_string, axis=1)
+    return data[["symptoms", "prognosis"]]
 
 
 training = pd.read_csv("disease-prediction/Training.csv")
@@ -85,10 +87,7 @@ testing = pd.read_csv("disease-prediction/Testing.csv")
 data = pd.concat([training, testing])
 
 train, test = train_test_split(
-    data,
-    test_size=0.2,
-    random_state=0,
-    stratify=data.prognosis
+    data, test_size=0.2, random_state=0, stratify=data.prognosis
 )
 
 add_noise(train).to_csv("disease-prediction/Training.csv", index=None)

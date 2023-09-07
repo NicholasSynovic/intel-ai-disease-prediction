@@ -23,7 +23,7 @@ if [ $# -ne 0 ]; then
 ]  PACKAGE=${PKG_ARRAY[0]}
   echo "Warning: No parameters expected. Applying default options..."
 else
- 
+
   echo -e "Select technology distribution: "
   select PACKAGE in "${PKG_ARRAY[@]}"; do
     [ -n "${PACKAGE}" ] && break
@@ -55,4 +55,3 @@ if eval "[[ $PACKAGE = ${PKG_ARRAY[1]} ]]"; then
     success
   fi
 fi
-

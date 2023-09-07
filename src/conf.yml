@@ -3,7 +3,7 @@ version: 1.0
 
 device: cpu
 
-model: 
+model:
         name: disease_pred
         framework: pytorch
 

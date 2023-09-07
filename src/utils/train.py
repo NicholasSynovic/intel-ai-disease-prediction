@@ -54,7 +54,6 @@ def train(
     writer: SummaryWriter = SummaryWriter(log_dir="tensorboard")
     acc: float = 0
 
-
     model.train()
 
     for epoch in range(1, epochs + 1):
@@ -122,7 +121,6 @@ def train(
         logger.info("Test Accuracy %.4f", testAcc)
 
         logger.info("Epoch %d, Loss %.4f", epoch, running_loss)
-
 
         writer.add_scalar(
             tag="Accuracy/train",
