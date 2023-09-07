@@ -30,7 +30,7 @@ else
   done
 fi
 
-ENV_NAME="disease_pred_$PACKAGE"
+ENV_NAME="intel_ai_disease_prediction"
 echo Creating conda environment $ENV_NAME...
 echo Setting up environment with packages : $PACKAGE...
 
