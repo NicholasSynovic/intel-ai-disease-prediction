@@ -13,3 +13,5 @@ dependencies:
     - intel_extension_for_pytorch
     - psutil
     - transformers
+    - tensorboard
+    - kaggle
