@@ -19,11 +19,10 @@ from contextlib import nullcontext
 
 import numpy as np
 import torch
-from transformers import AutoTokenizer
-from transformers import AutoModelForSequenceClassification
-from transformers import BertConfig, BertForSequenceClassification
+from transformers import (AutoModelForSequenceClassification, AutoTokenizer,
+                          BertConfig, BertForSequenceClassification)
 
-from utils.process_data import read_and_preprocess_data, REVERSE_MAPPING
+from utils.process_data import REVERSE_MAPPING, read_and_preprocess_data
 
 
 def inference(predict_fn, batch, flags) -> float:
@@ -82,7 +81,7 @@ def main(flags) -> None:
             flags.input_file,
             tokenizer,
             max_length=flags.seq_length,
-            include_label=False
+            include_label=False,
         )
         test_loader = torch.utils.data.DataLoader(
             test_dataset, batch_size=flags.batch_size, shuffle=False
@@ -95,6 +94,7 @@ def main(flags) -> None:
     # Load model into memory, if INC, need special loading
     if flags.is_inc_int8:
         from neural_compressor.utils.pytorch import load
+
         config = BertConfig.from_json_file(
             os.path.join(flags.saved_model_dir, "config.json")
         )
@@ -117,8 +117,8 @@ def main(flags) -> None:
 
     # JIT model for faster execution
     batch = next(iter(test_loader))
-    token_ids = batch['input_ids']
-    mask = batch['attention_mask']
+    token_ids = batch["input_ids"]
+    mask = batch["attention_mask"]
 
     jit_inputs = (token_ids, mask)
 
@@ -129,41 +129,29 @@ def main(flags) -> None:
         logger.info("Using IPEX to optimize model")
 
         model.eval()
-        
+
         # select dtype based on the flag
         if flags.bf16:
             dtype = torch.bfloat16
         else:
-            dtype = None # default dtype for ipex.optimize()
-        
+            dtype = None  # default dtype for ipex.optimize()
+
         with torch.no_grad(), torch.cpu.amp.autocast() if flags.bf16 else nullcontext():
             model = ipex.optimize(model, dtype=dtype)
-            model = torch.jit.trace(
-                model,
-                jit_inputs,
-                check_trace=False,
-                strict=False
-            )
+            model = torch.jit.trace(model, jit_inputs, check_trace=False, strict=False)
             model = torch.jit.freeze(model)
-    
+
     else:
         if flags.is_inc_int8:
             logger.info("Using INC Quantized model")
-        else:    
+        else:
             logger.info("Using stock model")
 
         model.eval()
-        model = torch.jit.trace(
-            model,
-            jit_inputs,
-            check_trace=False,
-            strict=False
-        )
+        model = torch.jit.trace(model, jit_inputs, check_trace=False, strict=False)
         model = torch.jit.freeze(model)
 
-    def predict(
-        batch
-    ) -> torch.Tensor:
+    def predict(batch) -> torch.Tensor:
         """Predicts the output for the given batch
             using the given PyTorch model.
 
@@ -175,106 +163,97 @@ def main(flags) -> None:
             torch.Tensor: predicted quantities
         """
         res = model(
-        input_ids=batch['input_ids'],
-        attention_mask=batch['attention_mask'])
+            input_ids=batch["input_ids"], attention_mask=batch["attention_mask"]
+        )
         return res
 
     if flags.benchmark_mode:
-        logger.info("Running experiment n = %d, b = %d, l = %d",
-                    flags.n_runs, flags.batch_size, flags.seq_length)
+        logger.info(
+            "Running experiment n = %d, b = %d, l = %d",
+            flags.n_runs,
+            flags.batch_size,
+            flags.seq_length,
+        )
 
         average_time = inference(predict, batch, FLAGS)
-        logger.info('Avg time per batch : %.3f s', average_time)
+        logger.info("Avg time per batch : %.3f s", average_time)
     else:
         predictions = []
         index = 0
         for _, batch in enumerate(test_loader):
-            pred_probs = torch.softmax(
-                predict(batch)['logits'], axis=1
-            ).detach().numpy()
+            pred_probs = (
+                torch.softmax(predict(batch)["logits"], axis=1).detach().numpy()
+            )
             for i in range(len(pred_probs)):
                 probs = {
                     REVERSE_MAPPING[x]: pred_probs[i, x]
                     for x in np.argsort(pred_probs[i, :])[::-1][:5]
                 }
-                predictions.append(
-                    {'id': index, 'prognosis': probs}
-                )
+                predictions.append({"id": index, "prognosis": probs})
                 index += 1
         print({"predictions": predictions})
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        '--saved_model_dir',
+        "--saved_model_dir",
         required=True,
         help="saved pretrained model to benchmark",
-        type=str
+        type=str,
     )
 
     parser.add_argument(
-        '--input_file',
-        required=True,
-        help="input to make predictions on",
-        type=str
+        "--input_file", required=True, help="input to make predictions on", type=str
     )
 
     parser.add_argument(
-        '--batch_size',
+        "--batch_size",
         default=-1,
         type=int,
-        help="batch size to use. if -1, uses all entries in input."
+        help="batch size to use. if -1, uses all entries in input.",
     )
 
     parser.add_argument(
-        '--benchmark_mode',
+        "--benchmark_mode",
         default=False,
         help="Benchmark instead of get predictions.",
-        action="store_true"
+        action="store_true",
     )
 
     parser.add_argument(
-        '--intel',
+        "--intel",
         default=False,
         action="store_true",
-        help="use intel accelerated technologies. defaults to False."
+        help="use intel accelerated technologies. defaults to False.",
     )
 
     parser.add_argument(
-        '--is_inc_int8',
+        "--is_inc_int8",
         default=False,
         action="store_true",
-        help="saved model dir is a quantized int8 model. defaults to False."
+        help="saved model dir is a quantized int8 model. defaults to False.",
     )
 
     parser.add_argument(
-        '--seq_length',
+        "--seq_length",
         default=512,
         help="sequence length to use. defaults to 512.",
-        type=int
+        type=int,
     )
 
-    parser.add_argument(
-        '--logfile',
-        help="logfile to use.",
-        default="",
-        type=str
-    )
+    parser.add_argument("--logfile", help="logfile to use.", default="", type=str)
 
     parser.add_argument(
-        '--n_runs',
+        "--n_runs",
         default=100,
         help="number of trials to test. defaults to 100.",
-        type=int
+        type=int,
     )
-    
+
     parser.add_argument(
-        '--bf16',
-        default=False,
-        action="store_true",
-        help="Enable bf16 inference"
+        "--bf16", default=False, action="store_true", help="Enable bf16 inference"
     )
 
     FLAGS = parser.parse_args()
